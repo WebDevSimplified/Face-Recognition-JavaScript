@@ -10,11 +10,10 @@ async function start() {
   let canvas
   let image
   const labeledFaceDescriptors = await loadLabeledImages()
-  console.log(labeledFaceDescriptors)
+  document.body.append('Loaded')
   imageUpload.addEventListener('change', async () => {
     if (canvas) canvas.remove()
     if (image) image.remove()
-    console.log(imageUpload.files[0])
     image = await faceapi.bufferToImage(imageUpload.files[0])
     document.body.append(image)
     canvas = faceapi.createCanvasFromMedia(image)
@@ -23,13 +22,19 @@ async function start() {
     faceapi.matchDimensions(canvas, displaySize)
     const detections = await faceapi.detectAllFaces(image).withFaceLandmarks().withFaceDescriptors()
     const resizedDetections = faceapi.resizeResults(detections, displaySize)
+    const faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.6)
+    const results = resizedDetections.map(d => faceMatcher.findBestMatch(d.descriptor))
+    results.forEach((bestMatch, i) => {
+      const box = resizedDetections[i].detection.box
+      const text = bestMatch.toString()
+      const drawBox = new faceapi.draw.DrawBox(box, { label: text })
+      drawBox.draw(canvas)
+    })
   })
 }
 
-
 function loadLabeledImages() {
-  const labels = ['Ant Man', 'Black Widow', 'Captain America', 'Captain Marvel', 'Hawkeye', 'Hulk', 'Iron Man', 'Jim Rhodes', 'Nebula', 'Thor', 'Tony Stark']
-  console.log('Here')
+  const labels = ['Black Widow', 'Captain America', 'Captain Marvel', 'Hawkeye', 'Jim Rhodes', 'Thor', 'Tony Stark']
   return Promise.all(
     labels.map(async label => {
       const descriptions = []
@@ -39,7 +44,6 @@ function loadLabeledImages() {
         const detections = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor()
         descriptions.push(detections.descriptor)
       }
-      console.log(descriptions)
       
       return new faceapi.LabeledFaceDescriptors(label, descriptions)
     })
